@@ -1,0 +1,1095 @@
+---
+title: "FNCE102"
+author: "Lim Kang Wen"
+date: "11/11/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Retrieve market index
+
+```{r Singapore}
+library(quantmod)
+library(purrr)
+library(xts)
+
+## retrieve STI index price for Estimation Window
+STIindex <- new.env()
+getSymbols("^STI", env = STIindex, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-28"))
+STI <- Cl(STIindex$STI)
+STI=na.omit(STI)
+STI=cbind(index(STI),data.frame(STI))
+date=as.Date(STI$`index(STI)`,format="%Y-%m-%d")
+STI=cbind.data.frame(date,STI[,-1])
+ncol = as.integer(dim(STI)[2])
+
+STI=xts(STI[,2:ncol],order.by=STI[,1])
+STIret=diff(log(STI))
+STIret=na.omit(STIret)
+
+## retrieve STI index price for Event Window
+STIeventindex <- new.env()
+getSymbols("^STI", env = STIeventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-19"))
+STIevent <- Cl(STIeventindex$STI)
+STIevent=na.omit(STIevent)
+STIevent=cbind(index(STIevent),data.frame(STIevent))
+date=as.Date(STIevent$`index(STIevent)`,format="%Y-%m-%d")
+STIevent=cbind.data.frame(date,STIevent[,-1])
+ncol = as.integer(dim(STIevent)[2])
+
+STIevent=xts(STIevent[,2:ncol],order.by=STIevent[,1])
+STIeventret=diff(log(STIevent))
+STIeventret=na.omit(STIeventret)
+
+## retrieve SP500 index price for Estimation Window
+SP500index <- new.env()
+getSymbols("^GSPC", env = SP500index, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-27"))
+SP500 <- Cl(SP500index$GSPC)
+SP500=na.omit(SP500)
+SP500=cbind(index(SP500),data.frame(SP500))
+date=as.Date(SP500$`index(SP500)`,format="%Y-%m-%d")
+SP500=cbind.data.frame(date,SP500[,-1])
+ncol = as.integer(dim(SP500)[2])
+
+SP500=xts(SP500[,2:ncol],order.by=SP500[,1])
+SP500ret=diff(log(SP500))
+SP500ret=na.omit(SP500ret)
+
+## retrieve SP500 index price for Event Window
+SP500eventindex <- new.env()
+getSymbols("^GSPC", env = SP500eventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-20"))
+SP500event <- Cl(SP500eventindex$GSPC)
+SP500event=na.omit(SP500event)
+SP500event=cbind(index(SP500event),data.frame(SP500event))
+date=as.Date(SP500event$`index(SP500event)`,format="%Y-%m-%d")
+SP500event=cbind.data.frame(date,SP500event[,-1])
+ncol = as.integer(dim(SP500event)[2])
+
+SP500event=xts(SP500event[,2:ncol],order.by=SP500event[,1])
+SP500eventret=diff(log(SP500event))
+SP500eventret=na.omit(SP500eventret)
+
+## retrieve SSEC index price for Estimation Window
+SSECindex <- new.env()
+SSEC <- getSymbols("000001.SS", env = SSECindex, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-28"), auto.assign = FALSE)
+SSEC <- Cl(SSEC)
+SSEC=na.omit(SSEC)
+SSEC=cbind(index(SSEC),data.frame(SSEC))
+date=as.Date(SSEC$`index(SSEC)`,format="%Y-%m-%d")
+SSEC=cbind.data.frame(date,SSEC[,-1])
+ncol = as.integer(dim(SSEC)[2])
+
+SSEC=xts(SSEC[,2:ncol],order.by=SSEC[,1])
+SSECret=diff(log(SSEC))
+SSECret=na.omit(SSECret)
+
+## retrieve SSEC index price for Event Window
+SSECeventindex <- new.env()
+SSECevent <- getSymbols("000001.SS", env = SSECeventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-26"), auto.assign = FALSE)
+SSECevent <- Cl(SSECevent)
+SSECevent=na.omit(SSECevent)
+SSECevent=cbind(index(SSECevent),data.frame(SSECevent))
+date=as.Date(SSECevent$`index(SSECevent)`,format="%Y-%m-%d")
+SSECevent=cbind.data.frame(date,SSECevent[,-1])
+ncol = as.integer(dim(SSECevent)[2])
+
+SSECevent=xts(SSECevent[,2:ncol],order.by=SSECevent[,1])
+SSECeventret=diff(log(SSECevent))
+SSECeventret=na.omit(SSECeventret)
+
+
+MM = function(y, x, end) {
+  alpha <- NULL
+  beta <- NULL
+  SSE <- NULL
+  for (i in 1:end) {
+    y1 = y[,i]
+    model = lm.fit(cbind(1,x),y1)
+    estimates = model$coefficients
+    alpha[i] = model$coefficients[1]
+    beta[i] = model$coefficients[2]
+    SSE[i] = sum(model$residuals^2)
+  }
+  cbind(alpha, beta, SSE)
+}
+
+```
+
+Sample code for Singapore Airline
+
+```{r Airline}
+#Airline
+
+#Estimation Window
+symbols = c("C6L.SI")
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-08-05", 
+             to = "2019-12-27",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Airline=xts(price[,2:ncol],order.by=price[,1])
+Airlineret=diff(log(Airline))
+Airlineret=na.omit(Airlineret)
+ncol=dim(Airlineret)[2]
+
+modelparameters = MM(Airlineret,STIret,ncol)
+alpha = modelparameters[,1]
+beta = modelparameters[,2]
+SSE = modelparameters[,3]
+
+totalobs = length(Airlineret[,1])
+samplevar = (1/(totalobs-2))*SSE
+
+#Event Window
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-12-27", 
+             to = "2020-02-19",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Airline=xts(price[,2:ncol],order.by=price[,1])
+Airlineret=diff(log(Airline))
+Airlineret=na.omit(Airlineret)
+ncol=dim(Airlineret)[2]
+
+## Predict price from MM
+n=length(Airlineret[,1])
+P.Airlineret = matrix(nrow=n,ncol=ncol)
+
+for (i in 1:ncol) {
+  P.Airlineret[,i] =  STIeventret*beta[i] + alpha[i]
+}
+
+## compute AR and CAR
+
+Airline.AR = Airlineret - P.Airlineret
+Airline.CAR = cumsum(Airline.AR)
+
+eventwindowlimit = (length(date[-1])-1)/2
+eventwindow = -eventwindowlimit:eventwindowlimit
+
+# plot the AR and CAR individually
+par(mfrow = c(1,1))
+
+for (i in 1:ncol) {
+plot(eventwindow,Airline.AR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Airline AR")
+abline(h=0)
+abline(v=0, col="red")
+
+plot(eventwindow,Airline.CAR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Airline CAR")
+abline(h=0)
+abline(v=0, col="red")
+}
+
+## generate t-value and p-value for CAR
+remainder = as.numeric(eventwindowlimit) %% 5
+ratio = floor(as.numeric(eventwindowlimit) / 5)
+
+list = 1:ratio
+list = list*5
+list[ratio] = list[ratio] + remainder
+numberofeventwindows = ratio*2 + 1
+
+
+CAReventwindow = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowtvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowpvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+
+limit = list + 1
+positivelimit = limit
+negativelimit = sort(-limit)
+
+maxlimit = max(limit)
+
+
+# solve for negative regions
+for (i in 1:ratio) {
+  LL = negativelimit[i]
+  Lindex = maxlimit + LL + 1
+  Uindex = maxlimit
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Airline.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(-LL*samplevar[j])
+  CAReventwindowtvalue[i,j] = calculatedtvalue
+  CAReventwindowpvalue[i,j] = 2*pt(q=abs(calculatedtvalue), df=-LL, lower.tail=FALSE)
+  }
+}
+# add event date CAR
+for (i in 1:ncol) {
+calculatedCAR = Airline.AR[Uindex,i]
+CAReventwindow[ratio+1,i] = calculatedCAR
+calculatedtvalue = calculatedCAR/sqrt(1*samplevar[j])
+CAReventwindowtvalue[ratio+1,i] = calculatedtvalue
+CAReventwindowpvalue[ratio+1,i] = 2*pt(q=abs(calculatedtvalue), df=1, lower.tail=FALSE)
+}
+
+# solve for positive regions
+for (i in 1:ratio) {
+  UL = limit[i]
+  Lindex = maxlimit
+  Uindex = maxlimit + UL - 1
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Airline.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i+ratio+1,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(UL*samplevar[j])
+  CAReventwindowtvalue[i+ratio+1,j] = calculatedtvalue
+  CAReventwindowpvalue[i+ratio+1,j] = 2*pt(q=abs(calculatedtvalue), df=UL, lower.tail=FALSE)
+  }
+}
+
+data = cbind(CAReventwindow, CAReventwindowtvalue, CAReventwindowpvalue)
+library(excelR)
+
+columns = data.frame(title=c('CAR', 't-value', 'p-value'), type=c('num', 'num', 'num'))
+##excelTable(data, columns=columns, digits=NA) 
+```
+
+Singapore Finance
+
+```{r Finance}
+
+#Finance
+
+#Estimation Window
+
+symbols = c("D05.SI","O39.SI","U11.SI","S68.SI","G07.SI")
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-08-05", 
+             to = "2019-12-27",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Finance=xts(price[,2:ncol],order.by=price[,1])
+Financeret=diff(log(Finance))
+Financeret=na.omit(Financeret)
+ncol=dim(Financeret)[2]
+
+modelparameters = MM(Financeret,STIret,ncol)
+alpha = modelparameters[,1]
+beta = modelparameters[,2]
+SSE = modelparameters[,3]
+
+totalobs = length(Financeret[,1])
+samplevar = (1/(totalobs-2))*SSE
+
+#Event Window
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-12-27", 
+             to = "2020-02-19",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Finance=xts(price[,2:ncol],order.by=price[,1])
+Financeret=diff(log(Finance))
+Financeret=na.omit(Financeret)
+ncol=dim(Financeret)[2]
+
+## Predict price from MM
+n=length(Financeret[,1])
+P.Financeret = matrix(nrow=n,ncol=ncol)
+
+for (i in 1:ncol) {
+  P.Financeret[,i] =  STIeventret*beta[i] + alpha[i]
+}
+
+## compute AR and CAR
+
+Finance.AR = Financeret - P.Financeret
+Finance.CAR = cumsum(Finance.AR)
+
+eventwindowlimit = (length(date[-1])-1)/2
+eventwindow = -eventwindowlimit:eventwindowlimit
+
+
+#plot the AR and CAR individually
+par(mfrow = c(1,1))
+
+for (i in 1:ncol) {
+plot(eventwindow,Finance.AR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Finance AR")
+abline(h=0)
+abline(v=0, col="red")
+
+plot(eventwindow,Finance.CAR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Finance CAR")
+abline(h=0)
+abline(v=0, col="red")
+}
+
+## generate t-value and p-value for CAR
+remainder = as.numeric(eventwindowlimit) %% 5
+ratio = floor(as.numeric(eventwindowlimit) / 5)
+
+list = 1:ratio
+list = list*5
+list[ratio] = list[ratio] + remainder
+numberofeventwindows = ratio*2 + 1
+
+
+CAReventwindow = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowtvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowpvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+
+limit = list + 1
+positivelimit = limit
+negativelimit = sort(-limit)
+
+maxlimit = max(limit)
+
+
+# solve for negative regions
+for (i in 1:ratio) {
+  LL = negativelimit[i]
+  Lindex = maxlimit + LL + 1
+  Uindex = maxlimit
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Finance.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(-LL*samplevar[j])
+  CAReventwindowtvalue[i,j] = calculatedtvalue
+  CAReventwindowpvalue[i,j] = 2*pt(q=abs(calculatedtvalue), df=-LL, lower.tail=FALSE)
+  }
+}
+# add event date CAR
+for (i in 1:ncol) {
+calculatedCAR = Finance.AR[Uindex,i]
+CAReventwindow[ratio+1,i] = calculatedCAR
+calculatedtvalue = calculatedCAR/sqrt(1*samplevar[j])
+CAReventwindowtvalue[ratio+1,i] = calculatedtvalue
+CAReventwindowpvalue[ratio+1,i] = 2*pt(q=abs(calculatedtvalue), df=1, lower.tail=FALSE)
+}
+
+# solve for positive regions
+for (i in 1:ratio) {
+  UL = limit[i]
+  Lindex = maxlimit
+  Uindex = maxlimit + UL - 1
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Finance.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i+ratio+1,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(UL*samplevar[j])
+  CAReventwindowtvalue[i+ratio+1,j] = calculatedtvalue
+  CAReventwindowpvalue[i+ratio+1,j] = 2*pt(q=abs(calculatedtvalue), df=UL, lower.tail=FALSE)
+  }
+}
+data = cbind(CAReventwindow, CAReventwindowtvalue, CAReventwindowpvalue)
+library(excelR)
+
+# determine mean diff
+HH = eventwindowlimit+1
+HHH = HH + eventwindowlimit
+befafttest <- matrix(data=NA, 4, ncol=ncol)
+for (i in 1:ncol) {
+result = t.test(Finance.AR[1:HH, i], Finance.AR[HH:HHH, i])
+befafttest[1, i] = result$statistic
+befafttest[2, i] = result$p.value
+befafttest[3, i] = as.numeric(result$estimate)[1] - as.numeric(result$estimate)[2]
+befafttest[4, i] = result$stderr
+}
+
+##excelTable(data, digits=NA) 
+##excelTable(befafttest, digits=NA)
+##excelTable(as.data.frame(Finance.AR), digits=NA)
+```
+
+US Finance
+
+```{r US}
+
+#Finance
+
+#Estimation Window
+
+symbols = c("JPM","BAC","WFC","C","MS")
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-08-05", 
+             to = "2019-12-27",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Finance=xts(price[,2:ncol],order.by=price[,1])
+Financeret=diff(log(Finance))
+Financeret=na.omit(Financeret)
+ncol=dim(Financeret)[2]
+
+modelparameters = MM(Financeret,SP500ret,ncol)
+alpha = modelparameters[,1]
+beta = modelparameters[,2]
+SSE = modelparameters[,3]
+
+totalobs = length(Financeret[,1])
+samplevar = (1/(totalobs-2))*SSE
+
+#Event Window
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-12-27", 
+             to = "2020-02-20",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Finance=xts(price[,2:ncol],order.by=price[,1])
+Financeret=diff(log(Finance))
+Financeret=na.omit(Financeret)
+ncol=dim(Financeret)[2]
+
+## Predict price from MM
+n=length(Financeret[,1])
+P.Financeret = matrix(nrow=n,ncol=ncol)
+
+for (i in 1:ncol) {
+  P.Financeret[,i] =  SP500eventret*beta[i] + alpha[i]
+}
+
+## compute AR and CAR
+
+Finance.AR = Financeret - P.Financeret
+Finance.CAR = cumsum(Finance.AR)
+
+eventwindowlimit = (length(date[-1])-1)/2
+eventwindow = -eventwindowlimit:eventwindowlimit
+
+# plot the AR and CAR individually
+par(mfrow = c(1,1))
+
+for (i in 1:ncol) {
+plot(eventwindow,Finance.AR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Finance AR")
+abline(h=0)
+abline(v=0, col="red")
+
+plot(eventwindow,Finance.CAR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Finance CAR")
+abline(h=0)
+abline(v=0, col="red")
+}
+
+## generate t-value and p-value for CAR
+remainder = as.numeric(eventwindowlimit) %% 5
+ratio = floor(as.numeric(eventwindowlimit) / 5)
+
+list = 1:ratio
+list = list*5
+list[ratio] = list[ratio] + remainder
+numberofeventwindows = ratio*2 + 1
+
+
+CAReventwindow = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowtvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowpvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+
+limit = list + 1
+positivelimit = limit
+negativelimit = sort(-limit)
+
+maxlimit = max(limit)
+
+
+# solve for negative regions
+for (i in 1:ratio) {
+  LL = negativelimit[i]
+  Lindex = maxlimit + LL + 1
+  Uindex = maxlimit
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Finance.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(-LL*samplevar[j])
+  CAReventwindowtvalue[i,j] = calculatedtvalue
+  CAReventwindowpvalue[i,j] = 2*pt(q=abs(calculatedtvalue), df=-LL, lower.tail=FALSE)
+  }
+}
+# add event date CAR
+for (i in 1:ncol) {
+calculatedCAR = Finance.AR[Uindex,i]
+CAReventwindow[ratio+1,i] = calculatedCAR
+calculatedtvalue = calculatedCAR/sqrt(1*samplevar[j])
+CAReventwindowtvalue[ratio+1,i] = calculatedtvalue
+CAReventwindowpvalue[ratio+1,i] = 2*pt(q=abs(calculatedtvalue), df=1, lower.tail=FALSE)
+}
+
+# solve for positive regions
+for (i in 1:ratio) {
+  UL = limit[i]
+  Lindex = maxlimit
+  Uindex = maxlimit + UL - 1
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Finance.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i+ratio+1,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(UL*samplevar[j])
+  CAReventwindowtvalue[i+ratio+1,j] = calculatedtvalue
+  CAReventwindowpvalue[i+ratio+1,j] = 2*pt(q=abs(calculatedtvalue), df=UL, lower.tail=FALSE)
+  }
+}
+
+data = cbind(CAReventwindow, CAReventwindowtvalue, CAReventwindowpvalue)
+library(excelR)
+
+
+# determine mean diff
+HH = eventwindowlimit+1
+HHH = HH + eventwindowlimit
+befafttest <- matrix(data=NA, 4, ncol=ncol)
+for (i in 1:ncol) {
+result = t.test(Finance.AR[1:HH, i], Finance.AR[HH:HHH, i])
+befafttest[1, i] = result$statistic
+befafttest[2, i] = result$p.value
+befafttest[3, i] = as.numeric(result$estimate)[1] - as.numeric(result$estimate)[2]
+befafttest[4, i] = result$stderr
+}
+
+##excelTable(data, digits=NA) 
+##excelTable(befafttest, digits=NA)
+##excelTable(as.data.frame(Finance.AR), digits=NA)
+```
+
+CN Finance
+
+```{r finance china}
+
+
+#Finance
+
+#Estimation Window
+
+symbols = c("1398.HK","2318.HK","1288.HK","3988.HK","3968.HK")
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-08-05", 
+             to = "2019-12-28",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Finance=xts(price[,2:ncol],order.by=price[,1])
+Financeret=diff(log(Finance))
+Financeret=na.omit(Financeret)
+ncol=dim(Financeret)[2]
+
+
+## additional code to solve discrepancies between SSEC and stocks data
+fulldata = merge.xts(SSECret,Financeret)
+fulldata=na.omit(fulldata)
+SSECret = fulldata[,1]
+Financeret = fulldata[,-1]
+
+modelparameters = MM(Financeret,SSECret,ncol)
+alpha = modelparameters[,1]
+beta = modelparameters[,2]
+SSE = modelparameters[,3]
+
+totalobs = length(Financeret[,1])
+samplevar = (1/(totalobs-2))*SSE
+
+#Event Window
+
+price = 
+  getSymbols(symbols, src = 'yahoo', 
+             from = "2019-12-27", 
+             to = "2020-02-26",
+             auto.assign = TRUE, 
+             warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  'colnames<-' (symbols)
+
+price=na.omit(price)
+price=cbind(index(price),data.frame(price))
+date=as.Date(price$`index(price)`,format="%Y-%m-%d")
+price=cbind.data.frame(date,price[,-1])
+ncol = as.integer(dim(price)[2])
+
+Finance=xts(price[,2:ncol],order.by=price[,1])
+Financeret=diff(log(Finance))
+Financeret=na.omit(Financeret)
+ncol=dim(Financeret)[2]
+
+
+## additional code to solve discrepancies between SSEC and stocks data
+fulldata = merge.xts(SSECeventret,Financeret)
+fulldata=na.omit(fulldata)
+SSECeventret = fulldata[,1]
+Financeret = fulldata[,-1]
+dim(Financeret)
+
+
+## Predict price from MM
+n=length(Financeret[,1])
+P.Financeret = matrix(nrow=n,ncol=ncol)
+
+
+
+
+for (i in 1:ncol) {
+  P.Financeret[,i] =  SSECeventret*beta[i] + alpha[i]
+}
+
+## compute AR and CAR
+
+Finance.AR = Financeret - P.Financeret
+Finance.CAR = cumsum(Finance.AR)
+
+eventwindowlimit = (dim(Financeret)[1]-1)/2
+eventwindow = -eventwindowlimit:eventwindowlimit
+
+# plot the AR and CAR individually
+par(mfrow = c(1,1))
+
+for (i in 1:ncol) {
+plot(eventwindow,Finance.AR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Finance AR")
+abline(h=0)
+abline(v=0, col="red")
+
+plot(eventwindow,Finance.CAR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="Finance CAR")
+abline(h=0)
+abline(v=0, col="red")
+}
+
+## generate t-value and p-value for CAR
+remainder = as.numeric(eventwindowlimit) %% 5
+ratio = floor(as.numeric(eventwindowlimit) / 5)
+
+list = 1:ratio
+list = list*5
+list[ratio] = list[ratio] + remainder
+numberofeventwindows = ratio*2 + 1
+
+
+CAReventwindow = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowtvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowpvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+
+limit = list + 1
+positivelimit = limit
+negativelimit = sort(-limit)
+
+maxlimit = max(limit)
+
+
+# solve for negative regions
+for (i in 1:ratio) {
+  LL = negativelimit[i]
+  Lindex = maxlimit + LL + 1
+  Uindex = maxlimit
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Finance.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(-LL*samplevar[j])
+  CAReventwindowtvalue[i,j] = calculatedtvalue
+  CAReventwindowpvalue[i,j] = 2*pt(q=abs(calculatedtvalue), df=-LL, lower.tail=FALSE)
+  }
+}
+# add event date CAR
+for (i in 1:ncol) {
+calculatedCAR = Finance.AR[Uindex,i]
+CAReventwindow[ratio+1,i] = calculatedCAR
+calculatedtvalue = calculatedCAR/sqrt(1*samplevar[j])
+CAReventwindowtvalue[ratio+1,i] = calculatedtvalue
+CAReventwindowpvalue[ratio+1,i] = 2*pt(q=abs(calculatedtvalue), df=1, lower.tail=FALSE)
+}
+
+# solve for positive regions
+for (i in 1:ratio) {
+  UL = limit[i]
+  Lindex = maxlimit
+  Uindex = maxlimit + UL - 1
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(Finance.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i+ratio+1,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(UL*samplevar[j])
+  CAReventwindowtvalue[i+ratio+1,j] = calculatedtvalue
+  CAReventwindowpvalue[i+ratio+1,j] = 2*pt(q=abs(calculatedtvalue), df=UL, lower.tail=FALSE)
+  }
+}
+
+data = cbind(CAReventwindow, CAReventwindowtvalue, CAReventwindowpvalue)
+library(excelR)
+
+# determine mean diff
+HH = eventwindowlimit+1
+HHH = HH + eventwindowlimit
+befafttest <- matrix(data=NA, 4, ncol=ncol)
+for (i in 1:ncol) {
+result = t.test(Finance.AR[1:HH, i], Finance.AR[HH:HHH, i])
+befafttest[1, i] = result$statistic
+befafttest[2, i] = result$p.value
+befafttest[3, i] = as.numeric(result$estimate)[1] - as.numeric(result$estimate)[2]
+befafttest[4, i] = result$stderr
+}
+
+##excelTable(data, digits=NA) 
+##excelTable(befafttest, digits=NA)
+##excelTable(as.data.frame(Finance.AR), digits=NA)
+
+```
+
+Compare different markets (Singapore, US, China)
+
+```{r marketindex}
+library(xts)
+
+#Estimation period
+worldindex <- new.env()
+getSymbols("URTH", env = worldindex, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-28"))
+world <- Cl(worldindex$URTH)
+world=na.omit(world)
+world=cbind(index(world),data.frame(world))
+date=as.Date(world$`index(world)`,format="%Y-%m-%d")
+world=cbind.data.frame(date,world[,-1])
+ncol = as.integer(dim(world)[2])
+
+world=xts(world[,2:ncol],order.by=world[,1])
+worldret=diff(log(world))
+worldret=na.omit(worldret)
+
+#Event period
+worldeventindex <- new.env()
+getSymbols("URTH", env = worldeventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-26"))
+worldevent <- Cl(worldeventindex$URTH)
+worldevent=na.omit(worldevent)
+worldevent=cbind(index(worldevent),data.frame(worldevent))
+date=as.Date(worldevent$`index(worldevent)`,format="%Y-%m-%d")
+worldevent=cbind.data.frame(date,worldevent[,-1])
+ncol = as.integer(dim(worldevent)[2])
+
+worldevent=xts(worldevent[,2:ncol],order.by=worldevent[,1])
+worldeventret=diff(log(worldevent))
+worldeventret=na.omit(worldeventret)
+
+
+
+## retrieve STI index price for Estimation Window
+STIindex <- new.env()
+getSymbols("^STI", env = STIindex, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-28"))
+STI <- Cl(STIindex$STI)
+STI=na.omit(STI)
+STI=cbind(index(STI),data.frame(STI))
+date=as.Date(STI$`index(STI)`,format="%Y-%m-%d")
+STI=cbind.data.frame(date,STI[,-1])
+ncol = as.integer(dim(STI)[2])
+
+STI=xts(STI[,2:ncol],order.by=STI[,1])
+STIret=diff(log(STI))
+STIret=na.omit(STIret)
+
+## retrieve STI index price for Event Window
+STIeventindex <- new.env()
+getSymbols("^STI", env = STIeventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-26"))
+STIevent <- Cl(STIeventindex$STI)
+STIevent=na.omit(STIevent)
+STIevent=cbind(index(STIevent),data.frame(STIevent))
+date=as.Date(STIevent$`index(STIevent)`,format="%Y-%m-%d")
+STIevent=cbind.data.frame(date,STIevent[,-1])
+ncol = as.integer(dim(STIevent)[2])
+
+STIevent=xts(STIevent[,2:ncol],order.by=STIevent[,1])
+STIeventret=diff(log(STIevent))
+STIeventret=na.omit(STIeventret)
+
+## retrieve SP500 index price for Estimation Window
+SP500index <- new.env()
+getSymbols("^GSPC", env = SP500index, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-27"))
+SP500 <- Cl(SP500index$GSPC)
+SP500=na.omit(SP500)
+SP500=cbind(index(SP500),data.frame(SP500))
+date=as.Date(SP500$`index(SP500)`,format="%Y-%m-%d")
+SP500=cbind.data.frame(date,SP500[,-1])
+ncol = as.integer(dim(SP500)[2])
+
+SP500=xts(SP500[,2:ncol],order.by=SP500[,1])
+SP500ret=diff(log(SP500))
+SP500ret=na.omit(SP500ret)
+
+## retrieve SP500 index price for Event Window
+SP500eventindex <- new.env()
+getSymbols("^GSPC", env = SP500eventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-26"))
+SP500event <- Cl(SP500eventindex$GSPC)
+SP500event=na.omit(SP500event)
+SP500event=cbind(index(SP500event),data.frame(SP500event))
+date=as.Date(SP500event$`index(SP500event)`,format="%Y-%m-%d")
+SP500event=cbind.data.frame(date,SP500event[,-1])
+ncol = as.integer(dim(SP500event)[2])
+
+SP500event=xts(SP500event[,2:ncol],order.by=SP500event[,1])
+SP500eventret=diff(log(SP500event))
+SP500eventret=na.omit(SP500eventret)
+
+## retrieve SSEC index price for Estimation Window
+SSECindex <- new.env()
+SSEC <- getSymbols("000001.SS", env = SSECindex, src = "yahoo",
+            from = as.Date("2019-08-05"), to = as.Date("2019-12-28"), auto.assign = FALSE)
+SSEC <- Cl(SSEC)
+SSEC=na.omit(SSEC)
+SSEC=cbind(index(SSEC),data.frame(SSEC))
+date=as.Date(SSEC$`index(SSEC)`,format="%Y-%m-%d")
+SSEC=cbind.data.frame(date,SSEC[,-1])
+ncol = as.integer(dim(SSEC)[2])
+
+SSEC=xts(SSEC[,2:ncol],order.by=SSEC[,1])
+SSECret=diff(log(SSEC))
+SSECret=na.omit(SSECret)
+
+## retrieve SSEC index price for Event Window
+SSECeventindex <- new.env()
+SSECevent <- getSymbols("000001.SS", env = SSECeventindex, src = "yahoo",
+            from = as.Date("2019-12-27"), to = as.Date("2020-02-26"), auto.assign = FALSE)
+SSECevent <- Cl(SSECevent)
+SSECevent=na.omit(SSECevent)
+SSECevent=cbind(index(SSECevent),data.frame(SSECevent))
+date=as.Date(SSECevent$`index(SSECevent)`,format="%Y-%m-%d")
+SSECevent=cbind.data.frame(date,SSECevent[,-1])
+ncol = as.integer(dim(SSECevent)[2])
+
+SSECevent=xts(SSECevent[,2:ncol],order.by=SSECevent[,1])
+SSECeventret=diff(log(SSECevent))
+SSECeventret=na.omit(SSECeventret)
+
+
+
+
+
+##merge 3 countries indices and world return for estimation window
+fullestimationdata = merge.xts(worldret, STIret, SP500ret, SSECret)
+fullestimationdata=na.omit(fullestimationdata)
+worldestret = fullestimationdata[,1]
+marketret = fullestimationdata[,-1]
+ncol=dim(marketret)[2]
+
+##merge 3 countries indices and world return for event window
+fullestimationdata = merge.xts(worldeventret, STIeventret, SP500eventret, SSECeventret)
+fullestimationdata=na.omit(fullestimationdata)
+worldeveret = fullestimationdata[,1]
+marketeventret = fullestimationdata[,-1]
+
+
+
+## 
+modelparameters = MM(marketret,worldestret,ncol)
+alpha = modelparameters[,1]
+beta = modelparameters[,2]
+SSE = modelparameters[,3]
+
+totalobs = length(marketret[,1])
+samplevar = (1/(totalobs-2))*SSE
+
+#Event Window
+
+## Predict price from MM
+n=length(marketeventret[,1])
+P.marketret = matrix(nrow=n,ncol=ncol)
+
+for (i in 1:ncol) {
+  P.marketret[,i] =  worldeveret*beta[i] + alpha[i]
+}
+
+## compute AR and CAR
+
+market.AR = marketeventret - P.marketret
+market.CAR = cumsum(market.AR)
+
+eventwindowlimit = (length(marketeventret[,1])-1)/2
+eventwindow = -eventwindowlimit:eventwindowlimit
+
+
+#plot the AR and CAR individually
+par(mfrow = c(1,1))
+
+for (i in 1:ncol) {
+plot(eventwindow,market.AR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="market AR")
+abline(h=0)
+abline(v=0, col="red")
+
+plot(eventwindow,market.CAR[,i],type="l",xlab="Event Window",ylab="AR",
+     main="market CAR")
+abline(h=0)
+abline(v=0, col="red")
+}
+
+
+plot(eventwindow, market.CAR[,1], type="l",xlab="Event Window", ylab="CAR", ylim=c(-0.1, 0.05))
+abline(h=0)
+abline(v=0, col="red")
+lines(eventwindow, market.CAR[,2], type="l", col="blue")
+lines(eventwindow, market.CAR[,3], type="l", col="red")
+legend("topright",c("SG","US","CN"),lty=c(1,1,1),box.lty=1,lwd=2,col=c("black","blue","red"),cex=0.8)
+
+
+## generate t-value and p-value for CAR
+remainder = as.numeric(eventwindowlimit) %% 5
+ratio = floor(as.numeric(eventwindowlimit) / 5)
+
+list = 1:ratio
+list = list*5
+list[ratio] = list[ratio] + remainder
+numberofeventwindows = ratio*2 + 1
+
+
+CAReventwindow = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowtvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+CAReventwindowpvalue = matrix(nrow=numberofeventwindows,ncol=ncol)
+
+limit = list + 1
+positivelimit = limit
+negativelimit = sort(-limit)
+
+maxlimit = max(limit)
+
+
+# solve for negative regions
+for (i in 1:ratio) {
+  LL = negativelimit[i]
+  Lindex = maxlimit + LL + 1
+  Uindex = maxlimit
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(market.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(-LL*samplevar[j])
+  CAReventwindowtvalue[i,j] = calculatedtvalue
+  CAReventwindowpvalue[i,j] = 2*pt(q=abs(calculatedtvalue), df=-LL, lower.tail=FALSE)
+  }
+}
+# add event date CAR
+for (i in 1:ncol) {
+calculatedCAR = market.AR[Uindex,i]
+CAReventwindow[ratio+1,i] = calculatedCAR
+calculatedtvalue = calculatedCAR/sqrt(1*samplevar[j])
+CAReventwindowtvalue[ratio+1,i] = calculatedtvalue
+CAReventwindowpvalue[ratio+1,i] = 2*pt(q=abs(calculatedtvalue), df=1, lower.tail=FALSE)
+}
+
+# solve for positive regions
+for (i in 1:ratio) {
+  UL = limit[i]
+  Lindex = maxlimit
+  Uindex = maxlimit + UL - 1
+  for (j in 1:ncol) {
+  calculatedCAR = tail(cumsum(market.AR[Lindex:Uindex,j]), n=1)
+  CAReventwindow[i+ratio+1,j] = calculatedCAR
+  calculatedtvalue = calculatedCAR/sqrt(UL*samplevar[j])
+  CAReventwindowtvalue[i+ratio+1,j] = calculatedtvalue
+  CAReventwindowpvalue[i+ratio+1,j] = 2*pt(q=abs(calculatedtvalue), df=UL, lower.tail=FALSE)
+  }
+}
+data = cbind(CAReventwindow, CAReventwindowtvalue, CAReventwindowpvalue)
+library(excelR)
+
+# determine mean diff
+HH = eventwindowlimit+1
+HHH = HH + eventwindowlimit
+befafttest <- matrix(data=NA, 4, ncol=ncol)
+for (i in 1:ncol) {
+result = t.test(market.AR[1:HH, i], market.AR[HH:HHH, i])
+befafttest[1, i] = result$statistic
+befafttest[2, i] = result$p.value
+befafttest[3, i] = as.numeric(result$estimate)[1] - as.numeric(result$estimate)[2]
+befafttest[4, i] = result$stderr
+}
+
+##excelTable(data, digits=NA) 
+##excelTable(befafttest, digits=NA)
+##excelTable(as.data.frame(market.AR), digits=NA)
+
+
+
+```
+
+
+
+
+
+
